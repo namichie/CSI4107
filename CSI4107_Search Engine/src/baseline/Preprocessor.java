@@ -20,11 +20,10 @@ public class Preprocessor {
 	HashMap<String, String> output; 
 	File outputFile;
 
-	//TODO - docID, title, description. can remove html src code manually...
 	public Preprocessor() {
 		ids = new ArrayList<String>();
 		content =  new ArrayList<String>();
-		output = new HashMap<String, String>(); //hashmap of hashmap?
+		output = new HashMap<String, String>(); 
 
 		// TODO - file path is hard-coded right now
 		//File input = new File("C:\\Users\\viet_\\Documents\\CSI\\4TH YR 2018-2019\\Winter 2019\\CSI4017_Search Engine\\src\\baseline\\csi_courses.txt");
@@ -35,43 +34,38 @@ public class Preprocessor {
 
 			Elements docIDs = doc.select("div.courseblock > p.courseblocktitle");
 
-			// Add course IDs to list
+			// Add course IDs, titles and descriptions to list
 			for (Element txt : docIDs) {
 				String title = txt.text();
 
 				// Extract course id from title
 				ids.add(title.substring(4, 8));
 
-			}
-
-			// Add course descriptions to list
-			for (Element description : docIDs) {	
-
 				// Courses with no course description
-				if (description.nextElementSibling().is("p.courseblockextra")) {
-					// Index of courses that don't have a text description (added N/A for now)
-					content.add(docIDs.indexOf(description), "N/A"); 
+				if (txt.nextElementSibling().is("p.courseblockextra")) {
 
-				// Courses with course description
-				} else if (description.nextElementSibling().is("p.courseblockdesc")) {
-					String text = description.text();
-					
-					String courseTitle = "";
-					int end = text.indexOf("(");
-					if (text.contains("units")) {
-						courseTitle = text.substring(9, end - 1);
+					// Index of courses that don't have a text description (added N/A for now)
+					content.add(docIDs.indexOf(txt), "N/A"); 
+
+					// Courses with course description
+				} else if (txt.nextElementSibling().is("p.courseblockdesc")) {
+
+					// Filter name of course and exclude credits/units
+					String courseName = "";
+					int end = title.indexOf("(");
+					if (title.contains("units")) {
+						courseName = title.substring(9, end - 1);
 					} else {
-						courseTitle = text.substring(9);
+						courseName = title.substring(9);
 					}
 
-					//System.out.println(text);
-					content.add(docIDs.indexOf(description), courseTitle + ":" + description.nextElementSibling().text());
-
+					// Add course title and description to list
+					content.add(docIDs.indexOf(txt), courseName + ":" + txt.nextElementSibling().text());
 				}
 			}
 
 
-			// Write id and description to file
+			// Add ID, title and description to hash map
 			for (int i = 0; i < ids.size(); i++) {
 				// Filter out French courses
 				if (ids.get(i).charAt(1) != '5' && ids.get(i).charAt(1) != '7') {
@@ -112,7 +106,6 @@ public class Preprocessor {
 	public File getOutputFile() {
 		return outputFile;
 	}
-
 
 
 	public static void main(String[] args) {
