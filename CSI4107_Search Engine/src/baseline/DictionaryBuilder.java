@@ -51,6 +51,8 @@ public class DictionaryBuilder {
 				if (parts.length >= 2) {
 					String docID = parts[0];
 					String text = parts[1];
+
+					// Separate course title and description
 					String courseDescription = "";
 					int start = text.indexOf(":");
 					if (text.contains(":")) {
@@ -58,25 +60,13 @@ public class DictionaryBuilder {
 					} else {
 						courseDescription = text;
 					}
-					
 					corpus.put(docID, courseDescription);
-				
-			}
+				}
 			}
 			reader.close();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
-		/*
-		 * // TODO - prints out the file for (String key : corpus.keySet()) {
-		 * System.out.println(key + "-" + corpus.get(key));
-		 * 
-		 * }
-		 */
-		// System.out.println("File read successfully");
-
 	}
 
 	private HashMap<String, String> getCorpus() {
@@ -96,9 +86,9 @@ public class DictionaryBuilder {
 
 			//tokens: tous les mots 'tokenized' le cours i
 			tokens = wst.tokenize(t[i]);
-			
+
 			ArrayList<String> tmp = new ArrayList<String>();
-			
+
 			for (int j = 0; j < tokens.length; j++) {
 				tmp.add(tokens[j]);
 			}
@@ -108,28 +98,27 @@ public class DictionaryBuilder {
 		/*System.out.println("Original tokens -: " + tokenList.get(4));
 
 		System.out.println("Original tokens ." + tokenList.get(101));*/ //TODO - tokenizes A.I. as A, ., I...
-		
+
 		return tokenList;
 
-
 	}
-	
+
 	//TODO - think of other stopwords to add to list related to courses
 
 	private ArrayList<ArrayList<String>> stopWordRemoval(boolean stopword) {
 		// Remove stopwords in the list (tokens) within the AccessList (tokenList)
 
-		//À travers de le arrayList
+		//Ã€ travers de le arrayList
 		for (int i = 0; i < tokenList.size(); i++) {
 
-			//À travers du arrayList à l'intérieur du ArrayList
+			//Ã€ travers du arrayList Ã  l'intÃ©rieur du ArrayList
 			//tokens du cours i
 			for (int j = 0; j < tokenList.get(i).size(); j++) {
 
-				//à travers de chaque mot du cours i
+				//Ã  travers de chaque mot du cours i
 				String word = tokenList.get(i).get(j);
 
-				//si c'est un stopword, enlève le mot
+				//si c'est un stopword, enlÃ¨ve le mot
 				if (isStopWord(word)==true) {
 
 					//enlever stop word du arrayList
@@ -159,12 +148,10 @@ public class DictionaryBuilder {
 						return true;
 				}
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 
 		} catch (FileNotFoundException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 		return false;
@@ -172,25 +159,25 @@ public class DictionaryBuilder {
 	}
 
 	private ArrayList<ArrayList<String>> stemming(boolean stem) {
-		
+
 		//declare and initialize PorterStemmer
 		PorterStemmer tmp = new PorterStemmer();
 
 		//declare and initialize stemword
 		String stemword = "";
 
-		//À travers de le arrayList
+		//Ã€ travers de le arrayList
 		for (int i = 0; i < tokenList.size(); i++) {
 
-			//À travers du arrayList à l'intérieur du ArrayList
+			//Ã€ travers du arrayList Ã  l'intÃ©rieur du ArrayList
 			//tokens du cours i
 			for (int j = 0; j < tokenList.get(i).size(); j++) {
 
-				//à travers de chaque mot du cours i
+				//Ã  travers de chaque mot du cours i
 				String word = tokenList.get(i).get(j);
 
 				//stem the word using the built-inn stem function
-				//si c'est un stopword, enlève le mot
+				//si c'est un stopword, enlÃ¨ve le mot
 				stemword = tmp.stem(word);
 
 				//replace word by stemword in arrayList
@@ -205,33 +192,33 @@ public class DictionaryBuilder {
 
 
 	private ArrayList<ArrayList<String>> normalization(boolean norm) {
-		
+
 		String normWord = "";
-		
-		//À travers de le arrayList
+
+		//Ã€ travers de le arrayList
 		for (int i = 0; i < tokenList.size(); i++) {
 
-			//À travers du arrayList à l'intérieur du ArrayList
+			//Ã€ travers du arrayList Ã  l'intÃ©rieur du ArrayList
 			//tokens du cours i
 			for (int j = 0; j < tokenList.get(i).size(); j++) {
 
-				//à travers de chaque mot du cours i
+				//Ã  travers de chaque mot du cours i
 				String word = tokenList.get(i).get(j);
 
 				// Normalize token
-				
+
 				//normWord = word.replaceAll("[.-]", "");
-				
-				
+
+
 				//replace word by stemword in arrayList
 				//tokenList.get(i).remove(j);	
-				
+
 			}
 			//System.out.println(normWord);
 		}
 
 		System.out.println("Norm: " + tokenList.get(0));
-		
+
 		return tokenList;
 	}
 
