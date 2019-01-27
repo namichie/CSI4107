@@ -26,7 +26,7 @@ public class Preprocessor {
 		output = new HashMap<String, String>(); 
 
 		// TODO - file path is hard-coded right now
-		//File input = new File("C:\\Users\\viet_\\Documents\\CSI\\4TH YR 2018-2019\\Winter 2019\\CSI4017_Search Engine\\src\\baseline\\csi_courses.txt");
+		//File input = new File("C:\\Users\\viet_\\Documents\\CSI\\4TH YR 2018-2019\\Winter 2019\\CSI4107_Search Engine\\src\\baseline\\csi_courses.txt");
 
 		try {
 			//Document doc = Jsoup.parse(input, "UTF-8", "https://catalogue.uottawa.ca/en/courses/csi/");
@@ -35,22 +35,22 @@ public class Preprocessor {
 			Elements docIDs = doc.select("div.courseblock > p.courseblocktitle");
 
 			// Add course IDs, titles and descriptions to list
-			for (Element txt : docIDs) {
-				String title = txt.text();
+			for (Element course : docIDs) {
+				String title = course.text();
 
 				// Extract course id from title
 				ids.add(title.substring(4, 8));
 
 				// Courses with no course description
-				if (txt.nextElementSibling().is("p.courseblockextra")) {
+				if (course.nextElementSibling().is("p.courseblockextra")) {
 
 					// Index of courses that don't have a text description (added N/A for now)
-					content.add(docIDs.indexOf(txt), "N/A"); 
+					content.add(docIDs.indexOf(course), "N/A"); 
 
-					// Courses with course description
-				} else if (txt.nextElementSibling().is("p.courseblockdesc")) {
+				// Courses with course description
+				} else if (course.nextElementSibling().is("p.courseblockdesc")) {
 
-					// Filter name of course and exclude credits/units
+					// Filter name of course and exclude credits/units from title
 					String courseName = "";
 					int end = title.indexOf("(");
 					if (title.contains("units")) {
@@ -60,10 +60,9 @@ public class Preprocessor {
 					}
 
 					// Add course title and description to list
-					content.add(docIDs.indexOf(txt), courseName + ":" + txt.nextElementSibling().text());
+					content.add(docIDs.indexOf(course), courseName + ":" + course.nextElementSibling().text());
 				}
 			}
-
 
 			// Add ID, title and description to hash map
 			for (int i = 0; i < ids.size(); i++) {
