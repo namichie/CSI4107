@@ -20,12 +20,12 @@ public class Preprocessor {
 	HashMap<String, String> output; 
 	File outputFile;
 
-//TODO - docID, title, description. can remove html src code manually...
+	//TODO - docID, title, description. can remove html src code manually...
 	public Preprocessor() {
 		ids = new ArrayList<String>();
 		content =  new ArrayList<String>();
 		output = new HashMap<String, String>(); //hashmap of hashmap?
-		
+
 		// TODO - file path is hard-coded right now
 		//File input = new File("C:\\Users\\viet_\\Documents\\CSI\\4TH YR 2018-2019\\Winter 2019\\CSI4017_Search Engine\\src\\baseline\\csi_courses.txt");
 
@@ -34,33 +34,49 @@ public class Preprocessor {
 			Document doc = Jsoup.connect("https://catalogue.uottawa.ca/en/courses/csi/").get();
 
 			Elements docIDs = doc.select("div.courseblock > p.courseblocktitle");
-			
+
 			// Add course IDs to list
 			for (Element txt : docIDs) {
 				String title = txt.text();
-				
+
 				// Extract course id from title
-				ids.add(title.substring(4, 8)); //TODO - filter french courses starting with 5 or 7
+				ids.add(title.substring(4, 8));
+
 			}
 
 			// Add course descriptions to list
 			for (Element description : docIDs) {	
-				
+
 				// Courses with no course description
 				if (description.nextElementSibling().is("p.courseblockextra")) {
 					// Index of courses that don't have a text description (added N/A for now)
 					content.add(docIDs.indexOf(description), "N/A"); 
-				
+
 				// Courses with course description
 				} else if (description.nextElementSibling().is("p.courseblockdesc")) {
-					content.add(docIDs.indexOf(description), description.nextElementSibling().text());
+					String text = description.text();
 					
+					String courseTitle = "";
+					int end = text.indexOf("(");
+					if (text.contains("units")) {
+						courseTitle = text.substring(9, end - 1);
+					} else {
+						courseTitle = text.substring(9);
+					}
+
+					//System.out.println(text);
+					content.add(docIDs.indexOf(description), courseTitle + ":" + description.nextElementSibling().text());
+
 				}
 			}
 
+
 			// Write id and description to file
 			for (int i = 0; i < ids.size(); i++) {
-				output.put(ids.get(i), content.get(i));
+				// Filter out French courses
+				if (ids.get(i).charAt(1) != '5' && ids.get(i).charAt(1) != '7') {
+					output.put(ids.get(i), content.get(i));
+				}
 			}
 
 			write(output);
@@ -74,7 +90,7 @@ public class Preprocessor {
 	private void write(HashMap<String, String> input) {
 
 		outputFile = new File(
-				"C:\\Users\\viet_\\Documents\\CSI\\4TH YR 2018-2019\\Winter 2019\\CSI4017_Search Engine\\src\\baseline\\csi_courses_output.txt");
+				"C:\\Users\\viet_\\Documents\\CSI\\4TH YR 2018-2019\\Winter 2019\\CSI4107_Search Engine\\src\\baseline\\csi_courses_output.txt");
 
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
@@ -92,12 +108,12 @@ public class Preprocessor {
 	public File getInputFile() {
 		return outputFile;
 	}
-	
+
 	public File getOutputFile() {
 		return outputFile;
 	}
-	
-	
+
+
 
 	public static void main(String[] args) {
 

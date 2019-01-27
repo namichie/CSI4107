@@ -51,10 +51,17 @@ public class DictionaryBuilder {
 				if (parts.length >= 2) {
 					String docID = parts[0];
 					String text = parts[1];
-					corpus.put(docID, text);
-				} else {
-					System.out.println("ignoring line: " + line);
-				}
+					String courseDescription = "";
+					int start = text.indexOf(":");
+					if (text.contains(":")) {
+						courseDescription = text.substring(start + 1);
+					} else {
+						courseDescription = text;
+					}
+					
+					corpus.put(docID, courseDescription);
+				
+			}
 			}
 			reader.close();
 		} catch (IOException e) {
@@ -97,9 +104,10 @@ public class DictionaryBuilder {
 			}
 			tokenList.add(i, tmp);
 		}
-		System.out.println("Original tokens -: " + tokenList.get(4));
+		System.out.println("Original tokens -: " + tokenList.get(0));
+		/*System.out.println("Original tokens -: " + tokenList.get(4));
 
-		System.out.println("Original tokens ." + tokenList.get(101)); //TODO - tokenizes A.I. as A, ., I...
+		System.out.println("Original tokens ." + tokenList.get(101));*/ //TODO - tokenizes A.I. as A, ., I...
 		
 		return tokenList;
 
@@ -189,9 +197,9 @@ public class DictionaryBuilder {
 				tokenList.get(i).set(j, stemword);					
 			}
 		}
-
-		System.out.println("Stemmed: " + tokenList.get(4));
-		System.out.println("Stemmed: " + tokenList.get(101));
+		System.out.println("Stemmed: " + tokenList.get(0));
+		/*System.out.println("Stemmed: " + tokenList.get(4));
+		System.out.println("Stemmed: " + tokenList.get(101));*/
 		return tokenList;
 	}
 
