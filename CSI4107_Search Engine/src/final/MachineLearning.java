@@ -26,23 +26,33 @@ public class MachineLearning {
 	protected TreeMap<String, String> corpus; // key: docID associated to value: description
 	protected TreeMap<String, String> titles; // key: docID associated to value: title
 	protected TreeMap<String, ArrayList<String>> topics; // FINAL: key: docID associated to value: list of topics
+	protected HashMap<String, ArrayList<String>> topictodocID; // Hashmap of topic to list of docIDs
+	protected HashMap<String, ArrayList<String>> topictodocID_NB; // Hashmap of training set topic to list of docIDs
 
-	protected HashMap<String, ArrayList<String>> trainingSet; // Training set
-	protected HashMap<String, ArrayList<String>> testSet; // Test set
 
-	protected TreeMap<String, ArrayList<String>> assignedTopics; // result of classification
-	protected TreeMap<String, String> unassignedDocs; // docs with no topics
+	protected HashMap<String, ArrayList<String>> trainingSet; // Training set (docID, list of tokens)
+	protected HashMap<String, ArrayList<String>> testSet; // Test set (docID, list of tokens)
 
+
+	//KNN
+	protected TreeMap<String, ArrayList<String>> assignedTopics; // result of classification (docID, list of topics)
+	protected TreeMap<String, String> unassignedDocs; // docs with no topics (docID, N/A)
+
+	// WRITE TO FILE
 	protected ArrayList<String> content;
 	protected TreeMap<String, String> output;
+
 
 	protected File outputFile;
 	private final String FILEPATH = System.getProperty("user.dir");
 	private final String STOPWORDS = File.separator + "stopwords.txt"; // stopword file
-	private final String OUTPUT = File.separator + "assigned_reuters_output.txt";
+	private final String OUTPUT = File.separator + "assigned_reuters_output.txt"; //text file output
+	private final String dirKNN = File.separator + "kNN"; //kNN folder
+	private final String dirNB = File.separator + "Naive_Bayes"; // NB folder
 
-	public MachineLearning() {
-		
+	// Algo - kNN or NB
+	public MachineLearning(String algo) {
+
 		content = new ArrayList<String>();
 		output = new TreeMap<String, String>();
 
@@ -63,6 +73,8 @@ public class MachineLearning {
 		trainingSet = new HashMap<String, ArrayList<String>>();
 		testSet = new HashMap<String, ArrayList<String>>();
 
+		topictodocID = new HashMap<String, ArrayList<String>>();	
+		topictodocID_NB = new HashMap<String, ArrayList<String>>();	
 
 		File file = rp.getOutputFile();
 		try {
@@ -76,8 +88,443 @@ public class MachineLearning {
 		this.normalization();
 		this.stemming();
 
+		try {
+			this.assignTopicTodocID();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+
+		this.assignTopicTodocID_NB();
+
+		if (algo.equals("kNN")) {
+			kNN();
+
+		} else if (algo.equals("NB")) {
+			NaiveBayes();
+		}
+
 	}
 
+
+	//------------------------------ Naive Bayes ---------------------------------
+	private void NaiveBayes() {
+		HashMap<String, ArrayList<String>> test = getTestSet();
+		HashMap<String, ArrayList<String>> training = getTrainingSet();
+
+		//1. Calculate priors
+		HashMap<String, Double> priors = calculatePriors(training);
+
+		//2. Calculate posterior
+		HashMap<String, HashMap<String, Double>> posteriors = calculatePosteriors();
+
+		//3. Determine class
+		//HashMap<String, String> res = determineClass(priors, posteriors, test);
+		determineClass(priors, posteriors, test);
+		//4 Output results in Naive Bayes' folder
+		//System.out.println("res: " + res);
+
+
+		// Reassign topics and write classified topics to file
+		TreeMap<String, ArrayList<String>> t = addToTopics();
+
+		// Combine topics + title + body
+		for (String key : t.keySet()) {
+			String topicString = String.join(" ", t.get(key));
+
+			content.add(topicString + ":" + titles.get(key) + "---" + corpus.get(key));
+			System.out.println(topicString + ":" + titles.get(key) + "---" + corpus.get(key));
+
+			// Add document to treemap
+			for (int j = 0; j < content.size(); j++) {
+
+				output.put(key, content.get(j));
+			}
+
+		}
+		write(output, "NB");
+
+	}
+
+
+	/* 
+	 * String: topic
+	 * Double: prior probability
+	 * */
+	private HashMap<String, Double> calculatePriors(HashMap<String, ArrayList<String>> training) {
+		HashMap<String, Double> priors = new HashMap<String, Double>();
+
+		int topic_num = 0;
+		int tot_docs = training.size(); //dénominateur - total number of docs
+
+		if (tot_docs>0) {
+			//loop through each topics ; TreeMap<String, ArrayList<String>>
+			for (String topic : topictodocID_NB.keySet()) {
+
+				//System.out.println("topic prior: " + topic);
+
+				if (!topic.equals("N/A")) {
+					topic_num = topictodocID_NB.get(topic).size();
+					if (topic_num!=0) {
+						double res = (double)topic_num/(double)tot_docs;
+						priors.put(topic, res);
+					}
+				}
+			} //end of for loop
+		} //end of if statement
+		//System.out.println("priors: "+ priors);
+		return priors;
+
+	} //end of function calculatePriors
+
+
+
+	/* 
+	 * String: topic
+	 * HashMap: String:word ; Double: posterior probability
+	 * */
+	private HashMap<String, HashMap<String, Double>> calculatePosteriors() {
+		HashMap<String, HashMap<String, Double>> posteriors = new HashMap<String, HashMap<String, Double>>();
+		int tmp;
+		String doc;
+
+		HashMap<String, Double> freq = new HashMap<String, Double>();
+		ArrayList<String> tokensInDoc = new ArrayList<String>();
+		HashMap<String, Double> value = new HashMap<String, Double>();
+		int total_tokens_per_topic; //dénominateur
+
+		//loop through each topics ; TreeMap<String, ArrayList<String>>
+		for (String topic : topictodocID_NB.keySet()) {
+			//System.out.println("topic calcPost: " + topic);
+			total_tokens_per_topic = 0; //reinitialize
+			value = new HashMap<String, Double>(); //reinitialize
+			freq = new HashMap<String, Double>(); //reinitialize
+
+			if (!topic.equals("N/A")) {
+
+				//loop through all documents corresponding to that topic ;tokenList = new HashMap<String, ArrayList<String>>()
+
+				tmp = topictodocID_NB.get(topic).size(); //nombre de doc
+
+				//loop through all documents of that topic
+				for(int j=0; j<tmp;j++) {
+
+					//if there's at least one document, then put words in uniqueTokensPerTopic set
+					if(tmp>0) {
+
+						doc = topictodocID_NB.get(topic).get(j); //doc j for topic i
+
+						if(tokenList.containsKey(doc)) {
+
+							tokensInDoc = tokenList.get(doc);
+							total_tokens_per_topic = total_tokens_per_topic + tokensInDoc.size(); //dénominateur
+
+							//update freq HashMap
+							for(int k=0; k<tokensInDoc.size();k++) {
+								String word = tokensInDoc.get(k);
+
+								if(freq.containsKey(word)) {
+									freq.replace(word, freq.get(word)+1.0); //incrémenter
+								} else {
+									freq.put(word, 1.0); //add to hashMap
+								}
+							}
+
+						}	
+					} //end of if statement
+				} //end of for loop j - fin de looper through all documents of that topic
+
+				//calculer les posteriors
+				for (String word : freq.keySet()) {
+					freq.replace(word, ((double)freq.get(word)/(double)total_tokens_per_topic)+0.1); //divide freq by total words for that topic
+				}
+
+				posteriors.put(topic, freq); //add posterior probabilities for that topic
+			}
+
+		} //end of for loop per topics
+
+		return posteriors;
+	}
+
+
+
+	/* 
+	 * priors, posteriors, test set
+	 * 
+	 * Priors:
+	 * 		String: topic
+	 * 		Double: prior probability
+	 * 
+	 * Posteriors:
+	 * 		String: topic
+	 * 		HashMap: String:word ; Double: posterior probability
+	 * 
+	private HashMap<String, String> determineClass(HashMap<String, Double> priors, HashMap<String, HashMap<String, Double>> posteriors, 
+			HashMap<String, ArrayList<String>> test) {
+
+		double prob, maxProb; //default value
+		String maxTopic;
+		ArrayList<String> tokens = new ArrayList<String>();
+		HashMap<String, String> res = new HashMap<String, String>(); //key:docID and value:topic	
+
+		//loop through all documents in the test set
+		for (String docID : test.keySet()) {
+
+			prob = -100.0; //reinitialize
+			maxProb = -1000.0; //reinitialize
+			maxTopic = "";
+			tokens = test.get(docID); //get all tokens for that document
+
+			//loop through all topics to find max probability
+			for (String topic : posteriors.keySet()) {
+
+				//loop through all tokens of docID
+				for(int i=0; i<tokens.size(); i++) {
+
+					String word = tokens.get(i); //mot
+
+					if(posteriors.containsKey(topic)) { //sujet existe
+
+						if (posteriors.get(topic).containsKey(word)) { //mot existe
+							if(prob == -100.0) {
+								prob = posteriors.get(topic).get(word);
+							} else {
+								prob = prob*posteriors.get(topic).get(word);
+							}					
+						} else { //mot n'existe pas
+							if(prob == -100.0) {
+								prob = 0.1;
+							} else {
+								prob = prob*0.1; //smoothing cuz word does not exist in hashMap
+							}	
+						}
+
+						//System.out.println("docID: " + docID + "   topic: " + topic + "   prob: " + prob);
+					}
+
+				} //end of loop through all tokens of docID
+
+				if(priors.containsKey(topic)) {
+					prob = prob*priors.get(topic); //multiply by prior of topic
+				} else {
+					prob = 0;
+				}
+
+				//compare maxProb
+				if(maxProb<prob) {
+					maxProb = prob;
+					maxTopic = topic;
+
+				}
+
+			} //end of loop through all topics
+			//System.out.println("maxp: " + maxProb);
+			//System.out.println("maxtopic: " + maxTopic);
+
+			res.put(docID, maxTopic);
+
+		} //end of loop through all documents in the test set
+
+		System.out.println(res);
+		return res;
+	} //end of determineClass function
+	 */	
+
+	/* 
+	 * priors, posteriors, test set
+	 * 
+	 * Priors:
+	 * 		String: topic
+	 * 		Double: prior probability
+	 * 
+	 * Posteriors:
+	 * 		String: topic
+	 * 		HashMap: String:word ; Double: posterior probability
+	 * */
+	private void determineClass(HashMap<String, Double> priors, HashMap<String, HashMap<String, Double>> posteriors, 
+			HashMap<String, ArrayList<String>> test) {
+
+		double prob, maxProb; //default value
+		String maxTopic;
+		ArrayList<String> tokens = new ArrayList<String>();
+		ArrayList<String> topicsList = new ArrayList<String>();
+
+		//loop through all documents in the test set
+		for (String docID : test.keySet()) {
+
+			prob = -100.0; //reinitialize
+			maxProb = -1000.0; //reinitialize
+			maxTopic = "";
+			tokens = test.get(docID); //get all tokens for that document
+
+			//loop through all topics to find max probability
+			for (String topic : posteriors.keySet()) {
+
+				//loop through all tokens of docID
+				for(int i=0; i<tokens.size(); i++) {
+
+					String word = tokens.get(i); //mot
+
+					if(posteriors.containsKey(topic)) { //sujet existe
+
+						if (posteriors.get(topic).containsKey(word)) { //mot existe
+							if(prob == -100.0) {
+								prob = posteriors.get(topic).get(word);
+							} else {
+								prob = prob*posteriors.get(topic).get(word);
+							}					
+						} else { //mot n'existe pas
+							if(prob == -100.0) {
+								prob = 0.1;
+							} else {
+								prob = prob*0.1; //smoothing cuz word does not exist in hashMap
+							}	
+						}
+
+						//System.out.println("docID: " + docID + "   topic: " + topic + "   prob: " + prob);
+					}
+
+				} //end of loop through all tokens of docID
+
+				if(priors.containsKey(topic)) {
+					prob = prob*priors.get(topic); //multiply by prior of topic
+				} else {
+					prob = 0;
+				}
+
+				//compare maxProb
+				if(maxProb<prob) {
+					maxProb = prob;
+					maxTopic = topic;
+
+					// Get docID of maxTopic to get list of topics
+					ArrayList<String> id = topictodocID_NB.get(maxTopic);
+
+					topicsList = topics.get(id.get(0));
+				}
+
+
+			} //end of loop through all topics
+
+			assignedTopics.put(docID, topicsList);
+
+		} //end of loop through all documents in the test set
+		System.out.println(assignedTopics);
+
+	} //end of determineClass function
+
+	// Given a topic, creates list of docIDs with this topic
+	private void assignTopicTodocID() throws FileNotFoundException {
+
+		String FILEPATH = System.getProperty("user.dir");
+		String INPUT = File.separator + "reuters21578.tar" + File.separator + "all-topics-strings.lc.txt";
+
+		File file = new File(FILEPATH + INPUT);
+		BufferedReader br = new BufferedReader(new FileReader(file));
+		String tmp;
+		ArrayList<String> topicsList = new ArrayList<String>();
+		ArrayList<String> list = new ArrayList<String>();
+
+		// Read list of topics into ArrayList
+		try {
+
+			while ((tmp = br.readLine()) != null) {
+				topicsList.add(tmp);
+
+			}
+
+			br.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// Get list of topics
+		TreeMap<String, ArrayList<String>> t = topics;
+
+		String topic = "";
+		String topic2 = "";
+		int len = 0;
+		for (int i = 0; i < topicsList.size(); i++) {
+
+			topic = topicsList.get(i);
+
+			list = new ArrayList<String>();
+
+			// Compare each topic to final topic list
+			for (String key : t.keySet()) {
+				len = t.get(key).size();
+
+				for (int j = 0; j < len; j++) {
+					topic2 = t.get(key).get(j);
+
+					if (topic.equals(topic2)) {
+
+						list.add(key);
+
+					}
+
+				}
+
+			}
+
+			topictodocID.put(topic, list);
+		}
+
+	}
+
+
+	// Given a topic, creates list of docIDs with this topic for training set
+	private void assignTopicTodocID_NB() {
+		ArrayList<String> topicsList = new ArrayList<String>();
+		ArrayList<String> list = new ArrayList<String>();
+
+		HashMap<String, ArrayList<String>> train = getTrainingSet();
+
+
+		// Get list of topics
+		TreeMap<String, ArrayList<String>> t = topics;
+
+		for (String id : t.keySet()) {
+
+			// if training set has same key as topic
+			if (train.containsKey(id)) {
+				topicsList.addAll(t.get(id));
+			}
+		}
+
+
+		String topic = "";
+		String topic2 = "";
+		int len = 0;
+		for (int i = 0; i < topicsList.size(); i++) {
+
+			topic = topicsList.get(i);
+
+			list = new ArrayList<String>();
+
+			// Compare each topic to final topic list
+			for (String key : t.keySet()) {
+				len = t.get(key).size();
+
+				for (int j = 0; j < len; j++) {
+					topic2 = t.get(key).get(j);
+
+					if (topic.equals(topic2)) {
+
+						list.add(key);
+
+					}
+
+				}
+
+			}
+
+			topictodocID_NB.put(topic, list);
+		}
+		System.out.println(topictodocID_NB);
+	}
+
+	//------------------------------ kNN ---------------------------------
 	private void kNN() {
 		HashMap<String, ArrayList<String>> test = getTestSet();
 
@@ -103,14 +550,14 @@ public class MachineLearning {
 
 		}
 
-		write(output);
+		write(output, "kNN");
 
 	} // end of k-NN function
 
-	
+
 
 	/*
-	 * Site used:
+	 * Sites used:
 	 * https://stackoverflow.com/questions/29061782/java-read-txt-file-to-hashmap-split-by 
 	 * Modified reading a treemap from a text file using the 1st solution
 	 * in StackOverflow
@@ -151,7 +598,6 @@ public class MachineLearning {
 
 							for (int i = 0; i < t.length; i++) {
 
-								// System.out.println(topic);
 								topicsList.add(t[i]);
 
 							}
@@ -159,11 +605,9 @@ public class MachineLearning {
 
 						// Add title
 						title = text.substring(endTopic + 1, endTitle);
-						// System.out.println(title);
 
 						// Add body
 						description = text.substring(endTitle + 3);
-						// System.out.println(description);
 
 					}
 					corpus.put(docID, description);
@@ -171,9 +615,7 @@ public class MachineLearning {
 					topics.put(docID, topicsList);
 
 				}
-				// System.out.println("ORIGINAL: " + topics);
 			}
-
 			reader.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -197,6 +639,7 @@ public class MachineLearning {
 			}
 
 		}
+
 		return trainingSet;
 
 	}
@@ -213,8 +656,8 @@ public class MachineLearning {
 		return testSet;
 	}
 
-	
-	
+
+
 	/*
 	 * Loop through all training set to find best similarity to that test document
 	 */
@@ -470,9 +913,13 @@ public class MachineLearning {
 	 */
 
 
-	private void write(TreeMap<String, String> input) {
+	private void write(TreeMap<String, String> input, String algo) {
 
-		outputFile = new File(FILEPATH + OUTPUT);
+		if (algo.equals("kNN")) {
+			outputFile = new File(FILEPATH + dirKNN + OUTPUT);
+		} else if (algo.equals("NB")) {
+			outputFile = new File(FILEPATH + dirNB + OUTPUT);
+		}
 
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
@@ -489,10 +936,13 @@ public class MachineLearning {
 
 
 	public static void main(String[] args) {
-		MachineLearning ml = new MachineLearning();
-
+		MachineLearning ml = new MachineLearning("NB");
+		//HashMap<String, ArrayList<String>> training = ml.getTrainingSet(); 
+		//ml.NaiveBayes();
+		//ml.assignTopicTodocID_NB();
+		/*ml.calculatePriors(training);
 		ml.kNN();
-		ml.addToTopics();
+		ml.addToTopics();*/
 
 
 	}
