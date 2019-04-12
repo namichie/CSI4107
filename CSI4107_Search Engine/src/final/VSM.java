@@ -49,6 +49,7 @@ public class VSM {
 	//For Reuters
 	VSM(DictionaryBuilder db) {
 		this.db = db;
+		this.thesaurus = new Thesaurus(db);
 		wordsetList = db.getExternalDictionary_reuter(); //externe 
 	}
 
@@ -245,13 +246,17 @@ public class VSM {
 		String expanded_qry = ""; //final result: expanded query
 		String tokenList[] = query.split(" "); //put all query words in array
 		String lastword = tokenList[tokenList.length-1]; //last in query
-		
+		String tmp = "";
 		//query must have at least one word, else return empty string
 		if (tokenList.length>0) {
-			String tmp = thesaurus.getMaxSimilarity(lastword);
-			expanded_qry = expanded_qry + " " + tmp;
+			tmp = thesaurus.getMaxSimilarity(lastword);
+			if(!query.equals(tmp)) {
+				expanded_qry = query + " " + tmp;
+			} else {
+				expanded_qry = query;
+			}
 		}
-		
+		System.out.println("expanded_qry: " + expanded_qry);
 		return expanded_qry;
 	}
 }
