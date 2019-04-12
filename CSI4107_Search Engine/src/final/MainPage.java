@@ -25,6 +25,7 @@ import java.awt.event.ActionEvent;
 import javax.swing.SwingConstants;
 import javax.swing.JCheckBox;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 
 public class MainPage extends JFrame {
 
@@ -47,7 +48,7 @@ public class MainPage extends JFrame {
 	private JTable table;
 	Boolean_Model bmodel;
 	VSM vsm;
-	DictionaryBuilder reutersDB = new DictionaryBuilder(true,true,false,'r');
+	DictionaryBuilder reutersDB;
 	String[] topicList = getTopicList();
 	Probabilistic pmodel;
 	QueryPreprocessor qprocessor  = new QueryPreprocessor();
@@ -148,7 +149,15 @@ public class MainPage extends JFrame {
 		docCollection.setBounds(454, 137, 118, 22);
 		frame.getContentPane().add(docCollection);
 
+		JComboBox classifier = new JComboBox();
+		classifier.setModel(new DefaultComboBoxModel(new String[] {"k-NN", "Naive Bayes"}));
+		classifier.setBounds(734, 137, 124, 22);
+		frame.getContentPane().add(classifier);
 
+		JLabel lblClassifierResults = new JLabel("Classifier Results:");
+		lblClassifierResults.setBounds(611, 141, 113, 14);
+		frame.getContentPane().add(lblClassifierResults);
+		
 		JScrollPane scrollPane = new JScrollPane();
 		scrollPane.setBounds(29, 333, 827, 319);
 		frame.getContentPane().add(scrollPane);
@@ -213,6 +222,13 @@ public class MainPage extends JFrame {
 					normalization = true; 
 				}
 
+				//Classifier: kNN or NB
+				if (classifier.getSelectedItem().toString().equals("k-NN")) {
+					reutersDB = new DictionaryBuilder(true,true,false,'r', "kNN");
+				} else if (classifier.getSelectedItem().toString().equals("Naive Bayes")) {
+					reutersDB = new DictionaryBuilder(true,true,false,'r', "NB");
+				}
+				
 				//BOOLEAN MODEL
 				if (modelType.getSelectedItem().toString().equals("Boolean")) {
 					
@@ -234,16 +250,10 @@ public class MainPage extends JFrame {
 					if (totalNumWord(qryInput)==1) {
 
 						//from the boolean model, get the list of course ID to display
-						//docIDList = bmodel.singleWordQuery(qryInput);
-						docIDList = filterDocbyTopic(bmodel.singleWordQuery(qryInput), list, reutersDB);
+						docIDList = filterDocbyTopic(bmodel.singleWordQuery(qryInput), list, reutersDB, docCollection.getSelectedItem().toString());
 
-						
-					}
-
-					else {
-						//docIDList = bmodel.postfixEval(bmodel.infixToPostfix(qryInput));
-						docIDList = filterDocbyTopic(bmodel.postfixEval(bmodel.infixToPostfix(qryInput)), list, reutersDB);
-
+					} else {
+						docIDList = filterDocbyTopic(bmodel.postfixEval(bmodel.infixToPostfix(qryInput)), list, reutersDB, docCollection.getSelectedItem().toString());
 					}
 
 					String[][] description = new String[docIDList.size()][5];
@@ -282,11 +292,12 @@ public class MainPage extends JFrame {
 						
 					} else if (docCollection.getSelectedItem().toString().equals("Reuters")) {
 						vsm = new VSM(reutersDB); 
+						qryInput = vsm.queryExpansion(qryInput);
 					}
 					
-
+					
 					ArrayList<HashMap<String, Double>> res = vsm.rankDocs(qryInput);
-					docIDList = vsm.getDocIDs(res);
+					docIDList = filterDocbyTopic(vsm.getDocIDs(res), list, reutersDB, docCollection.getSelectedItem().toString());
 					ArrayList<Double> scores = vsm.getScore(res);
 
 					String[][] description = new String[docIDList.size()][5];
@@ -412,21 +423,27 @@ public class MainPage extends JFrame {
 				d.descriptionTxt.setText(description);
 			}
 		});
-		btnViewDetails.setBounds(748, 299, 108, 23);
+		btnViewDetails.setBounds(719, 299, 137, 23);
 		frame.getContentPane().add(btnViewDetails);
 
 		JLabel lblpleaseLeaveA = new JLabel("(Please leave a space between each word/parentheses)");
 		lblpleaseLeaveA.setBounds(29, 58, 347, 14);
 		frame.getContentPane().add(lblpleaseLeaveA);
-
-		JComboBox comboBox = new JComboBox();
-		comboBox.setModel(new DefaultComboBoxModel(new String[] {"k-NN", "Naive Bayes"}));
-		comboBox.setBounds(734, 137, 124, 22);
-		frame.getContentPane().add(comboBox);
-
-		JLabel lblClassifierResults = new JLabel("Classifier Results:");
-		lblClassifierResults.setBounds(611, 141, 113, 14);
-		frame.getContentPane().add(lblClassifierResults);
+		
+		JButton btnViewThesaurus = new JButton("View Thesaurus");
+		btnViewThesaurus.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				//Popup code: JOptionPane.showMessageDialog(null, "Please select Reuters", "InfoBox: automatic thesaurus visualization", JOptionPane.INFORMATION_MESSAGE);
+				
+				String[] uniqueTokens = getDictionary(reutersDB.getDictionary());
+				VisualizeThesaurus v = new VisualizeThesaurus(uniqueTokens, reutersDB);
+				v.openWindow(); //open description form
+				
+				
+			}
+		});
+		btnViewThesaurus.setBounds(719, 269, 137, 23);
+		frame.getContentPane().add(btnViewThesaurus);
 
 	}
 
@@ -490,6 +507,15 @@ public class MainPage extends JFrame {
 	} //end of countWordsUsingSplit function
 
 
+	public String[] getDictionary(ArrayList<String> uniqueTokens) {
+		String[] res = new String[uniqueTokens.size()];
+		
+		for (int i=0; i<uniqueTokens.size(); i++) {
+			res[i] = uniqueTokens.get(i);
+		}
+		
+		return res;
+	}
 
 	//return list of topics from external text file (where the user chooses topic(s) form topic list)
 	public String[] getTopicList() throws FileNotFoundException {
@@ -516,7 +542,6 @@ public class MainPage extends JFrame {
 
 			br.close();
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
@@ -527,33 +552,37 @@ public class MainPage extends JFrame {
 	/*
 	 * For the reuters, this function returns the list of reuters with the selected topics
 	 */
-	public ArrayList<String> filterDocbyTopic(ArrayList<String> inputList, JList list, DictionaryBuilder db){
+	public ArrayList<String> filterDocbyTopic(ArrayList<String> inputList, JList list, DictionaryBuilder db, String type){
 		ArrayList<String> filteredList = new ArrayList<String>();
 		int[] index = list.getSelectedIndices(); //selected indexes
 		List selected_topic = list.getSelectedValuesList(); //selected topics
 		String topic = "";
 
-		if (index.length > 0) {
-			HashMap<String, ArrayList<String>> topictodocID = db.gettopictodocID(); //inverted index for topics
-			ArrayList<String> docIDs = new ArrayList<String>();
-			for (int i=0; i<selected_topic.size(); i++) { //iterate through each selected topics
-				topic = selected_topic.get(i).toString(); //topic selected by user
+		if (type.equals("Reuters")) {
+			if (index.length > 0) {
+				HashMap<String, ArrayList<String>> topictodocID = db.gettopictodocID(); //inverted index for topics
+				ArrayList<String> docIDs = new ArrayList<String>();
+				for (int i=0; i<selected_topic.size(); i++) { //iterate through each selected topics
+					topic = selected_topic.get(i).toString(); //topic selected by user
 
-				if (topictodocID.containsKey(topic)) { //if topic exists in hashmap
-					docIDs = topictodocID.get(topic); //list of docIDs from the inverted index for topics
+					if (topictodocID.containsKey(topic)) { //if topic exists in hashmap
+						docIDs = topictodocID.get(topic); //list of docIDs from the inverted index for topics
 
-					for (int j=0; j<inputList.size(); j++) {
-						if (docIDs.contains(inputList.get(j)) && !filteredList.contains(inputList.get(j))) {
-							filteredList.add(inputList.get(j));
-						}
-					} //end of for loop (j)
-				}
+						for (int j=0; j<inputList.size(); j++) {
+							if (docIDs.contains(inputList.get(j)) && !filteredList.contains(inputList.get(j))) {
+								filteredList.add(inputList.get(j));
+							}
+						} //end of for loop (j)
+					}
 
-			} //end of for loop (i)
-			return filteredList;
+				} //end of for loop (i)
+				return filteredList;
 
-		} else {
-			return inputList;
-		}
+			} else {
+				return inputList;
+			}
+		} 
+		return inputList;
+		
 	} //end of filterDocbyTopic function
 }
