@@ -36,6 +36,8 @@ public class DictionaryBuilder {
 	private final String STOPWORDS = File.separator + "stopwords.txt"; // stopword file
 
 	private final String INPUT = File.separator + "assigned_reuters_output.txt"; // reuters file
+	private final String dirKNN = File.separator + "kNN"; //kNN folder
+	private final String dirNB = File.separator + "Naive_Bayes"; // NB folder
 	private final String DICTIONARY = File.separator + "dictionary.txt"; // external dictionary
 	private final String INDEX = File.separator + "inverted_index.txt"; // external inverted index
 	private final String TOKENLIST = File.separator + "tokenlist.txt"; // external tokenlist
@@ -70,7 +72,7 @@ public class DictionaryBuilder {
 	}
 
 	// Reuters constructor ---------------------------------------------------
-	public DictionaryBuilder(boolean stopword, boolean normalization, boolean stemming, char type) {
+	public DictionaryBuilder(boolean stopword, boolean normalization, boolean stemming, char type, String algo) {
 
 		//TMPPP
 		int i = 0;
@@ -92,7 +94,14 @@ public class DictionaryBuilder {
 
 		File file = rp.getOutputFile();
 		try {
-			this.read_reuters(file);
+
+			if (algo.equals("kNN")) {
+				this.read_reuters(file, algo);
+
+			} else if (algo.equals("NB")) {
+				this.read_reuters(file, algo);
+			}
+
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -131,13 +140,17 @@ public class DictionaryBuilder {
 
 	/*
 	 * Site used:
-	 * https://stackoverflow.com/questions/29061782/java-read-txt-file-to-hashmap-
-	 * split-by Modified reading a treemap from a text file using the 1st solution
+	 * https://stackoverflow.com/questions/29061782/java-read-txt-file-to-hashmap-split-by 
+	 * Modified reading a treemap from a text file using the 1st solution
 	 * in StackOverflow
 	 */
-	private void read_reuters(File file) throws FileNotFoundException {
+	private void read_reuters(File file, String algo) throws FileNotFoundException {
 
-		file = new File(FILEPATH + INPUT);
+		if (algo.equals("kNN")) {
+			file = new File(FILEPATH + dirKNN + INPUT);
+		} else if (algo.equals("NB")) {
+			file = new File(FILEPATH + dirNB + INPUT);
+		}
 
 		String line;
 		BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
@@ -169,18 +182,16 @@ public class DictionaryBuilder {
 
 						for (int i = 0; i < t.length; i++) {
 
-							// System.out.println(topic);
 							topicsList.add(t[i]);
 
 						}
 
 						// Add title
 						title = text.substring(endTopic + 1, endTitle);
-						// System.out.println(title);
 
 						// Add body
 						description = text.substring(endTitle + 3);
-						// System.out.println(description);
+
 
 					}
 					corpus.put(docID, description);
@@ -605,7 +616,7 @@ public class DictionaryBuilder {
 		return topics;
 	}
 
-	//TODO
+
 	public String getTopic(String docID) {
 
 		ArrayList<String> lst = topics.get(docID);
@@ -620,9 +631,13 @@ public class DictionaryBuilder {
 
 
 	// Write to a file
-	private void writeDictionary(ArrayList<String> input) {
+	private void writeDictionary(ArrayList<String> input, String algo) {
 
-		outputFile = new File(FILEPATH + DICTIONARY);
+		if (algo.equals("kNN")) {
+			outputFile = new File(FILEPATH + dirKNN + DICTIONARY);
+		} else if (algo.equals("NB")) {
+			outputFile = new File(FILEPATH + dirNB + DICTIONARY);
+		}
 
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
@@ -638,9 +653,13 @@ public class DictionaryBuilder {
 	}
 
 
-	private void writeInvertedIndex(HashMap<String, ArrayList<String>> input) {
+	private void writeInvertedIndex(HashMap<String, ArrayList<String>> input, String algo) {
 
-		outputFile = new File(FILEPATH + INDEX);
+		if (algo.equals("kNN")) {
+			outputFile = new File(FILEPATH + dirKNN + INDEX);
+		} else if (algo.equals("NB")) {
+			outputFile = new File(FILEPATH + dirNB + INDEX);
+		}
 
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
@@ -657,10 +676,14 @@ public class DictionaryBuilder {
 		} catch (Exception e) {
 		}
 	}
-	
-	private void writeTokenList(ArrayList<ArrayList<String>> input) {
-		
-		outputFile = new File(FILEPATH + TOKENLIST);
+
+	private void writeTokenList(ArrayList<ArrayList<String>> input, String algo) {
+
+		if (algo.equals("kNN")) {
+			outputFile = new File(FILEPATH + dirKNN + TOKENLIST);
+		} else if (algo.equals("NB")) {
+			outputFile = new File(FILEPATH + dirNB + TOKENLIST);
+		}
 
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
@@ -676,7 +699,7 @@ public class DictionaryBuilder {
 			bw.close();
 		} catch (Exception e) {
 		}
-		
+
 	}
 
 	//Read external files
@@ -738,7 +761,7 @@ public class DictionaryBuilder {
 		return keytodocID;
 
 	}
-	
+
 	private ArrayList<ArrayList<String>> generate_Tokenlist_reuter() {
 
 		inputFile = new File(FILEPATH + TOKENLIST);
@@ -833,17 +856,17 @@ public class DictionaryBuilder {
 
 	public static void main(String[] args) throws IOException {
 
-		DictionaryBuilder db = new DictionaryBuilder(true,true,false,'r');
+		DictionaryBuilder db = new DictionaryBuilder(true,true,false,'r', "NB");
 		ArrayList<String> test = db.getDictionary();
 		//System.out.println("dict: " + test);
-		db.writeDictionary(test);
+		db.writeDictionary(test, "NB");
 
 		HashMap<String, ArrayList<String>> t = db.getInvertedIndex();
 		// System.out.println("Inv index: " + t);
-		db.writeInvertedIndex(t);
-		
+		db.writeInvertedIndex(t, "NB");
+
 		ArrayList<ArrayList<String>> tl = db.gettokenList();
-		db.writeTokenList(tl);
+		db.writeTokenList(tl, "NB");
 		//db.assignTopicTodocID();
 		/*HashMap<String, ArrayList<String>> t = db.gettopictodocID();
 		System.out.println(t);*/
